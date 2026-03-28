@@ -4,38 +4,82 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Weather Dashboard</title>
+
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:'Poppins',sans-serif}
-body{background:#020617;color:#e2e8f0}
 
-.container{max-width:1100px;margin:auto;padding:20px}
+body{
+  background:#020617;
+  color:#e2e8f0;
+}
 
-header{text-align:center;margin-bottom:20px}
+.container{
+  max-width:1100px;
+  margin:auto;
+  padding:20px;
+}
+
+header{
+  text-align:center;
+  margin-bottom:20px;
+}
+
 header h1{color:#38bdf8}
 
-.search{display:flex;gap:10px;margin-bottom:20px}
-.search input{flex:1;padding:10px;border-radius:5px;border:none}
-.search button{padding:10px;background:#38bdf8;border:none;border-radius:5px;cursor:pointer}
+.search{
+  display:flex;
+  gap:10px;
+  margin-bottom:20px;
+}
 
-.card{background:#0f172a;padding:20px;border-radius:10px;margin-bottom:20px}
+.search input{
+  flex:1;
+  padding:10px;
+  border-radius:5px;
+  border:none;
+}
 
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:15px}
+.search button{
+  padding:10px;
+  background:#38bdf8;
+  border:none;
+  border-radius:5px;
+  cursor:pointer;
+}
 
-.forecast{display:flex;gap:10px;overflow-x:auto}
-.forecast div{background:#1e293b;padding:10px;border-radius:8px;min-width:100px;text-align:center}
+.card{
+  background:#0f172a;
+  padding:20px;
+  border-radius:10px;
+  margin-bottom:20px;
+}
 
-canvas{margin-top:20px}
+.forecast{
+  display:flex;
+  gap:10px;
+  overflow-x:auto;
+}
+
+.forecast div{
+  background:#1e293b;
+  padding:10px;
+  border-radius:8px;
+  min-width:100px;
+  text-align:center;
+}
 </style>
 </head>
 
 <body>
+
 <div class="container">
+
 <header>
 <h1>Weather Dashboard</h1>
-<p>Real-time weather & analytics</p>
+<p>Real-time weather analytics</p>
 </header>
 
 <div class="search">
@@ -60,61 +104,116 @@ canvas{margin-top:20px}
 <h3>Humidity Chart</h3>
 <canvas id="humidityChart"></canvas>
 </div>
+
 </div>
 
 <script>
-const apiKey = "b1c5813e76eeebcf8677d20fa1cd679c"; // OpenWeatherMap
+const apiKey = "b1c5813e76eeebcf8677d20fa1cd679c";
+
+let tempChartInstance;
+let humidityChartInstance;
 
 async function getWeather(){
-const city = document.getElementById('city').value;
-fetchWeather(`https://api.openweathermap.org/data/2.5/forecast?q=${city}&appid=${apiKey}&units=metric`);
+  const city = document.getElementById('city').value;
+
+  if(!city){
+    alert("Enter city name");
+    return;
+  }
+
+  fetchWeather(`https://api.openweathermap.org/data/2.5/forecast?q=${city}&appid=${apiKey}&units=metric`);
 }
 
 function getLocationWeather(){
-navigator.geolocation.getCurrentPosition(pos=>{
-const {latitude, longitude} = pos.coords;
-fetchWeather(`https://api.openweathermap.org/data/2.5/forecast?lat=${latitude}&lon=${longitude}&appid=${apiKey}&units=metric`);
-});
+  if(!navigator.geolocation){
+    alert("Geolocation not supported");
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(pos=>{
+    const {latitude, longitude} = pos.coords;
+
+    fetchWeather(`https://api.openweathermap.org/data/2.5/forecast?lat=${latitude}&lon=${longitude}&appid=${apiKey}&units=metric`);
+  },
+  ()=>alert("Location access denied"));
 }
 
 async function fetchWeather(url){
-const res = await fetch(url);
-const data = await res.json();
+  try{
+    const res = await fetch(url);
+    const data = await res.json();
 
-const current = data.list[0];
-document.getElementById('current').innerHTML = `
-<h2>${data.city.name}</h2>
-<p>${current.main.temp}°C</p>
-<p>${current.weather[0].description}</p>`;
+    if(data.cod !== "200"){
+      alert("City not found");
+      return;
+    }
 
-let forecastHTML = '';
-let temps = [];
-let humidity = [];
-let labels = [];
+    const current = data.list[0];
 
-for(let i=0;i<7;i++){
-const item = data.list[i*8];
-const date = new Date(item.dt_txt).toLocaleDateString();
-forecastHTML += `<div><p>${date}</p><p>${item.main.temp}°C</p></div>`;
+    document.getElementById('current').innerHTML = `
+      <h2>${data.city.name}</h2>
+      <p><strong>${current.main.temp}°C</strong></p>
+      <p>${current.weather[0].description}</p>
+      <p>Humidity: ${current.main.humidity}%</p>
+    `;
 
-labels.push(date);
-temps.push(item.main.temp);
-humidity.push(item.main.humidity);
+    let forecastHTML = '';
+    let temps = [];
+    let humidity = [];
+    let labels = [];
+
+    for(let i=0;i<7;i++){
+      const item = data.list[i*8];
+      if(!item) break;
+
+      const date = new Date(item.dt_txt).toLocaleDateString();
+
+      forecastHTML += `
+        <div>
+          <p>${date}</p>
+          <p>${item.main.temp}°C</p>
+        </div>
+      `;
+
+      labels.push(date);
+      temps.push(item.main.temp);
+      humidity.push(item.main.humidity);
+    }
+
+    document.getElementById('forecast').innerHTML = forecastHTML;
+
+    updateChart('tempChart', temps, labels, 'Temperature', 'tempChartInstance');
+    updateChart('humidityChart', humidity, labels, 'Humidity', 'humidityChartInstance');
+
+  } catch(err){
+    alert("Error fetching data");
+    console.error(err);
+  }
 }
 
-document.getElementById('forecast').innerHTML = forecastHTML;
+function updateChart(canvasId, data, labels, label, instanceName){
 
-createChart('tempChart', labels, temps, 'Temperature');
-createChart('humidityChart', labels, humidity, 'Humidity');
+  if(window[instanceName]){
+    window[instanceName].destroy();
+  }
+
+  window[instanceName] = new Chart(document.getElementById(canvasId),{
+    type:'line',
+    data:{
+      labels:labels,
+      datasets:[{
+        label:label,
+        data:data
+      }]
+    },
+    options:{
+      responsive:true
+    }
+  });
 }
 
-function createChart(id, labels, data, label){
-new Chart(document.getElementById(id),{
- type:'line',
- data:{labels,datasets:[{label,data}]},
- options:{responsive:true}
-});
-}
+window.onload = getLocationWeather;
 </script>
+
 </body>
 </html>
